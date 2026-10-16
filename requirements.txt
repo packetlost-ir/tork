@@ -1,0 +1,16 @@
+cffi==2.1.1
+cryptography==50.0.2
+linkify-it-py==2.2.0
+markdown-it-py==4.2.0
+mdit-py-plugins==0.6.1
+mdurl==0.1.2
+platformdirs==4.13.3
+pycparser==3.11
+Pygments==2.21.0
+pyperclip==1.11.0
+python-socks==3.1.1
+rich==15.0.0
+stem==1.8.2
+textual==8.2.8
+-e git+https://github.com/packetlost-ir/tork.git@a576064df91e5141161bc564d8135dce1efb69f3#egg=tork
+typing_extensions==4.16.0
