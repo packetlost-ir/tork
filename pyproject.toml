@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tork"
+version = "0.1.0"
+description = "Secure, peer-to-peer terminal chat over Tor v3 onion services with E2EE"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Mohammad Saleh Abbasi" }
+]
+keywords = ["tor", "onion", "p2p", "chat", "terminal", "tui", "e2ee", "privacy"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: Communications :: Chat",
+    "Topic :: Security :: Cryptography",
+]
+dependencies = [
+    "stem>=1.8.2",
+    "python-socks[asyncio]>=2.5.0",
+    "cryptography>=42.0.0",
+    "textual>=0.70.0",
+    "pyperclip>=1.8.2"
+]
+
+[project.scripts]
+tork = "tork.cli:main"
