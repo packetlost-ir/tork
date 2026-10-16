@@ -1,11 +1,13 @@
 import asyncio
 import argparse
 import sys
+import traceback
 from tork.config import DEFAULT_LOCAL_PORT, SOCKS_PORT, normalize_and_validate_onion
 from tork.network.tor import get_controller, create_onion_service, destroy_onion_service
 from tork.network.server import PeerServer
 from tork.network.client import connect_peer
-from tork.network.protocol import send_frame
+from tork.network.protocol import send_frame, receive_frame, perform_initiator_handshake, perform_receiver_handshake
+from tork.crypto import encrypt_message, decrypt_message
 
 async def async_listen(local_port: int):
     print(f"Connecting to Tor daemon...")
@@ -26,14 +28,20 @@ async def async_listen(local_port: int):
     print(f"Onion service created: {full_onion}")
     print(f"Listening on 127.0.0.1:{local_port}...")
 
-    async def handle_msg(data, reader, writer):
+    async def handle_connection(reader, writer):
         try:
-            msg = data.decode("utf-8", errors="replace")
-        except Exception:
-            msg = repr(data)
-        print(f"[Incoming] {msg}")
+            shared_key = await perform_receiver_handshake(reader, writer)
+            print("[i] Receiving encrypted frame...")
+            encrypted_payload = await receive_frame(reader)
+            print("[i] Decrypting incoming payload...")
+            plaintext_bytes = decrypt_message(shared_key, encrypted_payload)
+            msg = plaintext_bytes.decode("utf-8", errors="replace")
+            print(f"[Incoming - Decrypted E2EE] {msg}", flush=True)
+        except Exception as e:
+            print(f"[!] Error processing incoming message: {e}", file=sys.stderr, flush=True)
+            traceback.print_exc()
 
-    server = PeerServer("127.0.0.1", local_port, on_message_callback=handle_msg)
+    server = PeerServer("127.0.0.1", local_port, on_message_callback=handle_connection)
     await server.start()
 
     stop_event = asyncio.Event()
@@ -66,15 +74,19 @@ async def async_send(onion_address: str, message: str, socks_port: int):
     try:
         reader, writer = await connect_peer(normalized_addr, socks_port=socks_port)
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        print(f"Error connecting to peer: {e}", file=sys.stderr)
         sys.exit(1)
 
     try:
-        payload = message.encode("utf-8")
-        await send_frame(writer, payload)
-        print("Message delivered securely over Tor.")
+        shared_key = await perform_initiator_handshake(reader, writer)
+        print("[i] Encrypting message with ChaCha20-Poly1305...")
+        encrypted_payload = encrypt_message(shared_key, message.encode("utf-8"))
+        print("[i] Sending encrypted frame...")
+        await send_frame(writer, encrypted_payload)
+        print("Message encrypted with ChaCha20-Poly1305 and delivered securely.")
     except Exception as e:
         print(f"Error sending message: {e}", file=sys.stderr)
+        traceback.print_exc()
         sys.exit(1)
     finally:
         writer.close()

@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from tork.network.protocol import receive_frame, send_frame
 
 class PeerServer:
@@ -10,17 +11,14 @@ class PeerServer:
 
     async def _handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         try:
-            while True:
-                data = await receive_frame(reader)
-                if not data:
-                    break
-                if self.on_message_callback:
-                    await self.on_message_callback(data, reader, writer)
-        except (asyncio.IncompleteReadError, ConnectionResetError):
-            pass
+            if self.on_message_callback:
+                await self.on_message_callback(reader, writer)
+        except Exception as e:
+            print(f"[!] Error in peer connection handler: {e}", flush=True)
+            traceback.print_exc()
         finally:
-            writer.close()
             try:
+                writer.close()
                 await writer.wait_closed()
             except Exception:
                 pass
