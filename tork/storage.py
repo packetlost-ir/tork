@@ -71,14 +71,33 @@ class StorageManager:
         if not is_valid:
             return False, f"Invalid onion address: {err}"
         
+        target_hash = normalized_onion.removesuffix(".onion")
         contacts = self._load_contacts_raw()
+        
+        # Deduplicate by onion hash
+        existing_alias = self.find_alias_by_onion(target_hash)
+        if existing_alias:
+            if existing_alias != alias:
+                # Rename the contact key to the new alias
+                data = contacts.pop(existing_alias)
+                if isinstance(data, dict):
+                    data["nickname"] = alias
+                else:
+                    data = {"nickname": alias, "onion": target_hash}
+                contacts[alias] = data
+            else:
+                if isinstance(contacts[alias], dict):
+                    contacts[alias]["nickname"] = alias
+            self._save_contacts_raw(contacts)
+            return True, target_hash
+
         contacts[alias] = {
             "nickname": alias,
-            "onion": normalized_onion.removesuffix(".onion"),
+            "onion": target_hash,
             "last_seen": None
         }
         self._save_contacts_raw(contacts)
-        return True, normalized_onion
+        return True, target_hash
 
     def get_contact(self, alias: str) -> str | None:
         """Returns clean 56-char onion string for an alias."""

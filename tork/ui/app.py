@@ -63,18 +63,43 @@ class TorkApp(App):
     def action_prompt_add_contact(self) -> None:
         async def _add_contact():
             h = await self.push_screen_wait(AddContactModal())
-            if h and h != self.local_onion_hash:
-                alias = f"peer-{h[:6]}"
-                self.storage.add_contact(alias, h)
-                self.refresh_contacts()
-                self.notify(f"Contact added: {alias}")
-                try:
-                    r, w = await connect_peer(h, socks_port=self.socks_port)
-                    key, ph, pn = await perform_protocol_handshake(r, w, self.local_onion_hash, self.display_name, True)
-                    await self.register_session(r, w, key, ph, pn, True)
-                except Exception: pass
+            if not h or h == self.local_onion_hash: return
+            
+            alias = self.storage.find_alias_by_onion(h) or f"peer-{h[:6]}"
+            self.storage.add_contact(alias, h)
+            self.refresh_contacts()
+            
+            # Switch focus to the contact
+            self.active_peer_hash = h
+            self.unread_counts[h] = 0
+            self.refresh_contacts()
+            
+            # Select in ListView
+            try:
+                lv = self.query_one("#contacts-list", ListView)
+                for i, item in enumerate(lv.children):
+                    if isinstance(item, ListItem) and item.name == h:
+                        lv.index = i
+                        break
+            except Exception: pass
+            
+            if h not in self.sessions:
+                self.run_worker(self._connect_to_peer(h, alias))
         
         self.run_worker(_add_contact())
+
+    async def _connect_to_peer(self, h: str, alias: str):
+        self.query_one("#chat-header", Static).update(f"Connecting to {alias} via Tor...")
+        try:
+            r, w = await connect_peer(h, socks_port=self.socks_port)
+            key, ph, pn = await perform_protocol_handshake(r, w, self.local_onion_hash, self.display_name, True)
+            await self.register_session(r, w, key, ph, pn, True)
+            if h == self.active_peer_hash:
+                self.query_one("#chat-header", Static).update(f"Chat: {alias} [E2EE Secured]")
+        except Exception as e:
+            if h == self.active_peer_hash:
+                self.query_one("#chat-header", Static).update(f"Chat: {alias} (Offline)")
+            self.notify(f"Failed to connect to {alias}: {e}", severity="error")
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -160,6 +185,7 @@ class TorkApp(App):
 
         lv.clear()
         items = []
+        seen_hashes = set()
         for alias, data in self.storage.list_contacts().items():
             if isinstance(data, dict):
                 h = clean_hash(data.get("onion", ""))
@@ -168,30 +194,39 @@ class TorkApp(App):
                 h = clean_hash(data)
                 name = alias
 
-            if not h or h == self.local_onion_hash:
+            if not h or h == self.local_onion_hash or h in seen_hashes:
                 continue
+            seen_hashes.add(h)
 
             cls = "online" if h in self.sessions else "offline"
             status = "●" if cls == "online" else "○"
             unread_cnt = self.unread_counts.get(h, 0)
             unread = f" [{unread_cnt}]" if unread_cnt > 0 else ""
             label = f"[{cls}]{status}[/] {name}{unread}"
-            items.append(ListItem(Label(label), name=name))
+            items.append(ListItem(Label(label), name=h))
 
         if items:
             lv.extend(items)
 
     def on_list_view_selected(self, event: ListView.Selected):
-        alias = event.item.name
-        h = self.storage.get_contact(alias)
+        h = event.item.name
+        alias = self.storage.find_alias_by_onion(h) or f"peer-{h[:6]}"
         self.active_peer_hash = h
         self.unread_counts[h] = 0
-        self.query_one("#chat-header", Static).update(f"Chat: {alias} ({h[:12]}...)")
+        
+        status_text = "[E2EE Secured]" if h in self.sessions else "(Offline)"
+        self.query_one("#chat-header", Static).update(f"Chat: {alias} {status_text}")
+        
         log = self.query_one("#chat-log", RichLog)
         log.clear()
         for m in self.chat_buffers.get(h, []):
             color = "yellow" if m["sender"] == "me" else "cyan"
-            log.write(f"[{m['ts']}] [bold {color}]{'You' if m['sender']=='me' else h[:6]}:[/] {m['text']}")
+            who = "You" if m["sender"] == "me" else h[:6]
+            log.write(f"[{m['ts']}] [bold {color}]{who}:[/] {m['text']}")
+            
+        if h not in self.sessions:
+            self.run_worker(self._connect_to_peer(h, alias))
+            
         self.refresh_contacts()
 
     async def on_input_submitted(self, event: Input.Submitted):
