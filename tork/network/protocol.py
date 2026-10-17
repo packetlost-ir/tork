@@ -86,7 +86,8 @@ class PeerSession:
         if self._keepalive_task: self._keepalive_task.cancel()
         try:
             self.writer.close()
-            await self.writer.wait_closed()
+            # Non-blocking wait_closed to avoid hang on exit
+            await asyncio.wait_for(self.writer.wait_closed(), timeout=0.5)
         except Exception: pass
         await self.app_callback("closed", self.peer_hash, None)
 

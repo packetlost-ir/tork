@@ -119,12 +119,18 @@ class TorkApp(App):
 
     async def start_services(self):
         try:
-            self.controller = get_controller(self.control_port)
+            self.controller = await asyncio.to_thread(get_controller, self.control_port)
             id = self.storage.load_identity()
             if id:
-                h, _, _ = create_onion_service(self.controller, self.local_port, id["key_type"], id["private_key"])
+                h, _, _ = await asyncio.to_thread(
+                    create_onion_service, 
+                    self.controller, 
+                    self.local_port, 
+                    id["key_type"], 
+                    id["private_key"]
+                )
             else:
-                h, t, k = create_onion_service(self.controller, self.local_port)
+                h, t, k = await asyncio.to_thread(create_onion_service, self.controller, self.local_port)
                 self.storage.save_identity(h, t, k)
             self.local_onion_hash = clean_hash(h)
             if not self.display_name: self.display_name = f"peer-{self.local_onion_hash[:6]}"
@@ -241,7 +247,26 @@ class TorkApp(App):
         self.chat_buffers[h].append(msg)
         self.query_one("#chat-log", RichLog).write(f"[{ts}] [bold yellow]You:[/] {text}")
 
+    async def on_unmount(self):
+        self._closing = True
+        for s in list(self.sessions.values()):
+            try: await s.close()
+            except Exception: pass
+        self.sessions.clear()
+        
+        if hasattr(self, 'server') and self.server and self.server.server:
+            try:
+                self.server.server.close()
+                await self.server.server.wait_closed()
+            except Exception: pass
+            
+        if hasattr(self, 'controller') and self.controller:
+            try:
+                await asyncio.to_thread(self.controller.close)
+            except Exception: pass
+
     async def action_quit(self):
-        for s in list(self.sessions.values()): await s.close()
-        if hasattr(self, 'server'): await self.server.stop()
-        self.exit()
+        import os, sys
+        os._exit(0)
+
+
