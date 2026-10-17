@@ -129,6 +129,7 @@ class TorkApp(App):
         self.post_message(PeerEvent(type, h, data))
 
     def on_peer_event(self, event: PeerEvent):
+        if self._closing or not self.is_mounted: return
         h = event.peer_hash
         if event.type == "chat":
             msg = {"sender": "peer", "text": event.data["m"], "ts": time.strftime("%H:%M")}
@@ -145,17 +146,40 @@ class TorkApp(App):
             if event.type == "closed": self.sessions.pop(h, None)
             self.refresh_contacts()
 
-    def refresh_contacts(self):
-        lv = self.query_one("#contacts-list", ListView)
+    def refresh_contacts(self) -> None:
+        if not self.is_mounted or self._closing or getattr(self, "_pruning", False):
+            return
+
+        try:
+            lv = self.query_one("#contacts-list", ListView)
+        except Exception:
+            return
+
+        if not lv.is_mounted or not lv.is_attached:
+            return
+
         lv.clear()
+        items = []
         for alias, data in self.storage.list_contacts().items():
-            h = clean_hash(data["onion"])
-            if h == self.local_onion_hash: continue
-            status = "●" if h in self.sessions else "○"
+            if isinstance(data, dict):
+                h = clean_hash(data.get("onion", ""))
+                name = data.get("nickname") or alias
+            else:
+                h = clean_hash(data)
+                name = alias
+
+            if not h or h == self.local_onion_hash:
+                continue
+
             cls = "online" if h in self.sessions else "offline"
-            unread = f" [{self.unread_counts.get(h, 0)}]" if self.unread_counts.get(h, 0) > 0 else ""
-            label = f"[{cls}]{status}[/] {alias}{unread}"
-            lv.append(ListItem(Label(label), name=alias))
+            status = "●" if cls == "online" else "○"
+            unread_cnt = self.unread_counts.get(h, 0)
+            unread = f" [{unread_cnt}]" if unread_cnt > 0 else ""
+            label = f"[{cls}]{status}[/] {name}{unread}"
+            items.append(ListItem(Label(label), name=name))
+
+        if items:
+            lv.extend(items)
 
     def on_list_view_selected(self, event: ListView.Selected):
         alias = event.item.name
