@@ -5,6 +5,7 @@ from textual.widgets import Header, Footer, Static, Input, RichLog, ListItem, Li
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual import work
+from rich.panel import Panel
 
 from tork.config import DEFAULT_LOCAL_PORT, SOCKS_PORT, CONTROL_PORT, CONNECT_TIMEOUT, clean_hash, normalize_and_validate_onion
 from tork.storage import StorageManager
@@ -24,16 +25,16 @@ class PeerEvent(Message):
 
 class TorkApp(App):
     CSS = """
-    Screen { background: #111; color: #eee; }
+    Screen { background: $surface; color: $text; }
     #main { layout: horizontal; }
-    #sidebar { width: 35; background: #1a1a1a; border-right: solid #333; }
+    #sidebar { width: 35; background: $boost; border-right: solid $primary-background; }
     #chat { layout: vertical; }
-    #chat-header { height: 3; background: #222; padding: 1; color: #0fa; }
-    #chat-log { height: 1fr; background: #161616; }
+    #chat-header { height: 3; background: $panel; padding: 1; color: $accent; }
+    #chat-log { height: 1fr; background: $surface; }
     #input-box { height: 3; }
-    .online { color: #0f0; }
-    .offline { color: #555; }
-    .unread { color: #f0f; text-style: bold; }
+    .online { color: $success; }
+    .offline { color: $text-muted; }
+    .unread { color: $error; text-style: bold; }
     """
 
     COMMANDS = App.COMMANDS | {TorkCommandProvider}
@@ -159,6 +160,46 @@ class TorkApp(App):
     async def protocol_callback(self, type, h, data):
         self.post_message(PeerEvent(type, h, data))
 
+    def write_message_to_log(self, sender: str, text: str, ts: str, h: str):
+        log = self.query_one("#chat-log", RichLog)
+        is_me = (sender == "me")
+        
+        if is_me:
+            who = self.display_name or "You"
+            bg_color = "on #2b5278"
+            align_tag = "right"
+        else:
+            who = self.storage.find_alias_by_onion(h) or f"peer-{h[:6]}"
+            bg_color = "on #182533"
+            align_tag = "left"
+
+        max_w = max(20, log.size.width - 10) if log.size.width > 15 else 50
+        wrapped_lines = []
+        for paragraph in text.splitlines():
+            if not paragraph:
+                wrapped_lines.append("")
+            else:
+                while len(paragraph) > max_w:
+                    wrapped_lines.append(paragraph[:max_w])
+                    paragraph = paragraph[max_w:]
+                wrapped_lines.append(paragraph)
+
+        lines = wrapped_lines if wrapped_lines else [""]
+        max_content_len = max(len(l) for l in lines) if lines else 0
+        width = max(len(who) + 2, max_content_len + 2)
+
+        content_lines = []
+        for l in lines:
+            content_lines.append(f" {l.ljust(width - 1)}")
+        box_str = "\n".join(content_lines)
+        rendered = f"[{bg_color}]{box_str}[/]"
+        
+        log.write("")
+        log.write(f"[{align_tag}][dim] {who} [/][/{align_tag}]")
+        log.write(f"[{align_tag}]{rendered}[/{align_tag}]")
+        log.write(f"[{align_tag}][dim] {ts} [/][/{align_tag}]")
+        log.write("")
+
     def on_peer_event(self, event: PeerEvent):
         if self._closing or not self.is_mounted: return
         h = event.peer_hash
@@ -168,7 +209,7 @@ class TorkApp(App):
             self.chat_buffers[h].append(msg)
             
             if h == self.active_peer_hash:
-                self.query_one("#chat-log", RichLog).write(f"[{msg['ts']}] [bold cyan]{h[:6]}:[/] {msg['text']}")
+                self.write_message_to_log("peer", msg["text"], msg["ts"], h)
             else:
                 self.unread_counts[h] = self.unread_counts.get(h, 0) + 1
                 self.notify(f"New message from {h[:6]}")
@@ -226,9 +267,7 @@ class TorkApp(App):
         log = self.query_one("#chat-log", RichLog)
         log.clear()
         for m in self.chat_buffers.get(h, []):
-            color = "yellow" if m["sender"] == "me" else "cyan"
-            who = "You" if m["sender"] == "me" else h[:6]
-            log.write(f"[{m['ts']}] [bold {color}]{who}:[/] {m['text']}")
+            self.write_message_to_log(m["sender"], m["text"], m["ts"], h)
             
         if h not in self.sessions:
             self.run_worker(self._connect_to_peer(h, alias))
@@ -245,7 +284,7 @@ class TorkApp(App):
         msg = {"sender": "me", "text": text, "ts": ts}
         if h not in self.chat_buffers: self.chat_buffers[h] = []
         self.chat_buffers[h].append(msg)
-        self.query_one("#chat-log", RichLog).write(f"[{ts}] [bold yellow]You:[/] {text}")
+        self.write_message_to_log("me", text, ts, h)
 
     async def on_unmount(self):
         self._closing = True
