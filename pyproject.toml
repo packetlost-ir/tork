@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "tork"
-version = "0.2.0"
+name = "tortalk"
+version = "1.0.0"
 description = "Secure, peer-to-peer terminal chat over Tor v3 onion services with E2EE"
 readme = "README.md"
 requires-python = ">=3.10"
