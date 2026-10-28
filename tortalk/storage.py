@@ -1,7 +1,7 @@
 import os
 import json
 from pathlib import Path
-from tork.config import normalize_and_validate_onion, resolve_config_dir
+from tortalk.config import normalize_and_validate_onion, resolve_config_dir
 
 class StorageManager:
     def __init__(self, config_dir: str | Path | None = None, profile: str | None = None):

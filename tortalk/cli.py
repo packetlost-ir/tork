@@ -3,17 +3,17 @@ import argparse
 import sys
 import traceback
 import pyperclip
-from tork.config import DEFAULT_LOCAL_PORT, SOCKS_PORT, CONTROL_PORT, CONNECT_TIMEOUT, normalize_and_validate_onion, clean_hash
-from tork.network.tor import get_controller, create_onion_service, destroy_onion_service
-from tork.network.server import PeerServer
-from tork.network.client import connect_peer
-from tork.network.protocol import (
+from tortalk.config import DEFAULT_LOCAL_PORT, SOCKS_PORT, CONTROL_PORT, CONNECT_TIMEOUT, normalize_and_validate_onion, clean_hash
+from tortalk.network.tor import get_controller, create_onion_service, destroy_onion_service
+from tortalk.network.server import PeerServer
+from tortalk.network.client import connect_peer
+from tortalk.network.protocol import (
     send_frame, receive_frame, perform_protocol_handshake,
     encode_payload, decode_payload, OP_CHAT,
 )
-from tork.crypto import encrypt_message, decrypt_message
-from tork.storage import StorageManager
-from tork.ui.app import TorkApp
+from tortalk.crypto import encrypt_message, decrypt_message
+from tortalk.storage import StorageManager
+from tortalk.ui.app import TorkApp
 
 async def async_listen(local_port: int, control_port: int, timeout: float):
     print(f"Connecting to Tor daemon (control port {control_port})...")

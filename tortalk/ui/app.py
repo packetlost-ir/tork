@@ -7,14 +7,14 @@ from textual.message import Message
 from textual import work
 from rich.panel import Panel
 
-from tork.config import DEFAULT_LOCAL_PORT, SOCKS_PORT, CONTROL_PORT, CONNECT_TIMEOUT, clean_hash, normalize_and_validate_onion
-from tork.storage import StorageManager
-from tork.network.tor import get_controller, create_onion_service, destroy_onion_service
-from tork.network.server import PeerServer
-from tork.network.client import connect_peer
-from tork.network.protocol import PeerSession, OP_CHAT, perform_protocol_handshake
-from tork.ui.commands import TorkCommandProvider
-from tork.ui.modals import AddContactModal
+from tortalk.config import DEFAULT_LOCAL_PORT, SOCKS_PORT, CONTROL_PORT, CONNECT_TIMEOUT, clean_hash, normalize_and_validate_onion
+from tortalk.storage import StorageManager
+from tortalk.network.tor import get_controller, create_onion_service, destroy_onion_service
+from tortalk.network.server import PeerServer
+from tortalk.network.client import connect_peer
+from tortalk.network.protocol import PeerSession, OP_CHAT, perform_protocol_handshake
+from tortalk.ui.commands import TorkCommandProvider
+from tortalk.ui.modals import AddContactModal
 
 class PeerEvent(Message):
     def __init__(self, type, peer_hash, data=None):

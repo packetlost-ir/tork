@@ -3,7 +3,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Static
 from textual.containers import Container
 from textual import events
-from tork.config import normalize_and_validate_onion
+from tortalk.config import normalize_and_validate_onion
 
 class AddContactModal(ModalScreen[str | None]):
     """Command-palette-styled input for pasting a 56-char onion hash."""

@@ -2,7 +2,7 @@ import asyncio
 import struct
 import json
 import time
-from tork.crypto import generate_ephemeral_keypair, derive_shared_key, encrypt_message, decrypt_message
+from tortalk.crypto import generate_ephemeral_keypair, derive_shared_key, encrypt_message, decrypt_message
 
 # Opcodes
 OP_HANDSHAKE_INIT = 1

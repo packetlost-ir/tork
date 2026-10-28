@@ -1,5 +1,5 @@
 from stem.control import Controller
-from tork.config import CONTROL_PORT
+from tortalk.config import CONTROL_PORT
 
 def get_controller(control_port: int = CONTROL_PORT) -> Controller:
     controller = Controller.from_port(port=control_port)

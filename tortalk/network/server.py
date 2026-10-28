@@ -1,6 +1,6 @@
 import asyncio
 import traceback
-from tork.network.protocol import perform_protocol_handshake
+from tortalk.network.protocol import perform_protocol_handshake
 
 class PeerServer:
     def __init__(self, host, port, local_hash, local_name, session_callback):
